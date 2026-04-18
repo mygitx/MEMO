@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>나의 일일 메모장</title>
+    <!-- Tailwind CSS (디자인 프레임워크) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons (아이콘 라이브러리) -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Canvas Confetti (폭죽 효과 라이브러리) -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;700;900&display=swap');
+        
+        body {
+            font-family: 'Pretendard', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* 커스텀 스크롤바 디자인 */
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #e2e8f0; border-radius: 20px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background-color: #cbd5e1; }
+
+        /* 애니메이션 효과 */
+        .fade-in { animation: fadeIn 0.3s ease-out forwards; }
+        .zoom-in { animation: zoomIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .slide-up { animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes zoomIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+        [hidden] { display: none !important; }
+    </style>
+</head>
+<body class="bg-gray-200 min-h-screen flex justify-center">
+
+    <!-- 앱 메인 컨테이너 -->
+    <div id="app" class="w-full max-w-md bg-sky-100 flex flex-col h-[100dvh] relative shadow-lg overflow-hidden border-x border-sky-200">
+        
+        <!-- 상단 헤더 영역 -->
+        <header class="flex justify-between items-start p-5 pb-2">
+            <!-- 오늘 날짜 버튼 (클릭 시 상세 시간 토글) -->
+            <button id="dateBtn" class="bg-white/50 px-3 py-1.5 rounded-xl text-xs font-bold text-sky-800 shadow-sm border border-white hover:bg-white/70 transition">
+                <span id="simpleDate"></span>
+            </button>
+            <h1 class="font-black text-lg text-sky-900 leading-tight mt-2">나의 일일 메모장</h1>
+            <!-- 날씨 정보 버튼 (클릭 시 미니 모달) -->
+            <button id="weatherBtn" class="p-2 bg-white/50 hover:bg-white/70 rounded-full transition shadow-sm border border-white relative">
+                <i data-lucide="cloud-sun" class="text-sky-600 w-5 h-5"></i>
+                <div id="weatherModal" class="absolute top-12 right-0 w-44 bg-white/95 backdrop-blur shadow-xl rounded-2xl p-4 z-50 border border-sky-100 hidden fade-in">
+                    <h3 class="font-bold border-b pb-2 text-sky-800 text-xs flex items-center gap-1">
+                        <i data-lucide="sparkles" class="w-3 h-3"></i> 오늘의 날씨
+                    </h3>
+                    <div class="space-y-2 mt-2">
+                        <div class="flex items-center gap-2 text-[11px]"><i data-lucide="thermometer" class="text-orange-400 w-3.5 h-3.5"></i> 기온: 22°C (맑음)</div>
+                        <div class="flex items-center gap-2 text-[11px]"><i data-lucide="wind" class="text-teal-400 w-3.5 h-3.5"></i> 미세먼지: 좋음</div>
+                        <div class="flex items-center gap-2 text-[11px]"><i data-lucide="droplets" class="text-blue-400 w-3.5 h-3.5"></i> 습도: 45%</div>
+                    </div>
+                </div>
+            </button>
+        </header>
+
+        <!-- 상세 시간 표시창 (평소엔 숨김) -->
+        <div id="exactTimeBox" class="px-5 mb-2 hidden fade-in">
+            <div id="exactDate" class="text-[11px] font-medium text-sky-700 bg-sky-200/40 px-3 py-1 rounded-lg text-center border border-sky-200/50"></div>
+        </div>
+
+        <!-- 디데이(D-Day) 카드 영역 -->
+        <div class="px-5 mb-4 flex gap-2">
+            <div class="flex-1 bg-white/40 rounded-2xl py-2 px-3 flex flex-col items-center border border-white/50 shadow-sm">
+                <span class="text-[10px] text-sky-700 font-bold opacity-70">12월 13일</span>
+                <span id="dday1" class="text-sm font-black text-sky-600"></span>
+            </div>
+            <div class="flex-1 bg-white/40 rounded-2xl py-2 px-3 flex flex-col items-center border border-white/50 shadow-sm">
+                <span class="text-[10px] text-sky-700 font-bold opacity-70">6월 30일</span>
+                <span id="dday2" class="text-sm font-black text-sky-600"></span>
+            </div>
+        </div>
+
+        <!-- 주간 출석체크 섹션 -->
+        <section class="px-5 mb-4">
+            <div class="bg-white/70 rounded-[24px] p-4 shadow-sm border border-white">
+                <div class="flex justify-between items-center mb-3">
+                    <span class="font-extrabold text-sky-900 text-xs">주간 출석체크</span>
+                    <button id="checkInBtn" class="text-[11px] font-black px-4 py-1.5 rounded-full shadow-sm transition-all active:scale-95 bg-sky-500 text-white hover:bg-sky-600">
+                        오늘 출석!
+                    </button>
+                </div>
+                <div id="attendanceRow" class="flex justify-between bg-sky-50/50 rounded-2xl p-2.5 border border-sky-100/50">
+                    <!-- 자바스크립트에서 요일별 아이템 생성 예정 -->
+                </div>
+            </div>
+        </section>
+
+        <!-- 메인 콘텐츠 (메모장 6 : 할 일 4) -->
+        <section class="flex-1 px-5 pb-4 flex gap-3 min-h-0">
+            <!-- 자유 메모장 -->
+            <div class="flex-[6] bg-[#fefce8] rounded-[28px] p-5 shadow-sm border border-white flex flex-col focus-within:ring-2 focus-within:ring-sky-300 transition-all">
+                <h2 class="font-bold text-amber-900 text-xs mb-3 flex items-center gap-1.5 opacity-70">
+                    <i data-lucide="sparkles" class="w-3 h-3"></i> 자유 메모장
+                </h2>
+                <textarea id="memoArea" class="flex-1 w-full bg-transparent resize-none outline-none text-sm text-slate-700 placeholder-amber-900/20 leading-relaxed custom-scrollbar" placeholder="여기에 소중한 기록을 남겨보세요..."></textarea>
+            </div>
+
+            <!-- 할 일(To-Do) 리스트 -->
+            <div class="flex-[4] bg-white/80 rounded-[28px] p-4 shadow-sm border border-white flex flex-col">
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="font-bold text-sky-900 text-xs opacity-70">할 일</h2>
+                    <button id="openTodoModalBtn" class="bg-sky-100 p-1.5 rounded-xl hover:bg-sky-200 text-sky-700 transition active:scale-90 shadow-sm">
+                        <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                    </button>
+                </div>
+                <div id="todoList" class="flex-1 overflow-y-auto pr-1 space-y-2 custom-scrollbar">
+                    <!-- 자바스크립트에서 할 일 리스트 생성 예정 -->
+                </div>
+            </div>
+        </section>
+
+        <!-- 푸터 영역 -->
+        <footer class="py-4 text-center">
+            <p class="text-[10px] font-bold text-slate-400 tracking-tight">제작자: 김소현의 영원한 베프, 전민</p>
+        </footer>
+
+        <!-- 포춘 쿠키 응원 팝업 (앱 로드 시 1회 노출) -->
+        <div id="fortuneOverlay" class="absolute inset-0 bg-sky-900/20 backdrop-blur-[2px] z-[100] flex justify-center items-center p-8 hidden fade-in">
+            <div class="bg-white rounded-[32px] p-8 shadow-2xl w-full text-center border-4 border-sky-100 zoom-in">
+                <div class="w-16 h-16 bg-sky-100 rounded-full flex items-center justify-center mx-auto mb-5 text-sky-500">
+                    <i data-lucide="heart" class="w-8 h-8 fill-current"></i>
+                </div>
+                <h4 class="text-sky-900 font-black text-lg mb-2">오늘의 응원 한마디</h4>
+                <p id="fortuneText" class="text-slate-600 font-bold mb-8 leading-relaxed"></p>
+                <button id="closeFortuneBtn" class="w-full bg-sky-500 text-white font-black py-4 rounded-2xl shadow-lg shadow-sky-200 active:scale-95 transition-all">고마워!</button>
+            </div>
+        </div>
+
+        <!-- 할 일 추가용 바텀 시트(모달) -->
+        <div id="todoOverlay" class="absolute inset-0 bg-black/30 backdrop-blur-sm z-[110] flex justify-center items-end hidden fade-in">
+            <div class="bg-white w-full rounded-t-[40px] p-8 pb-12 shadow-2xl slide-up">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="font-black text-xl text-sky-900">새로운 할 일</h3>
+                    <button id="closeTodoModalBtn" class="text-slate-300 hover:text-slate-500 transition-colors bg-slate-100 p-2 rounded-full">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+                <input id="todoInput" type="text" class="w-full bg-sky-50 border-2 border-sky-100 rounded-2xl px-5 py-4 outline-none focus:border-sky-400 transition-all font-bold text-sky-900 placeholder-sky-200 mb-6" placeholder="오늘 할 일을 적어보세요">
+                <button id="saveTodoBtn" class="w-full bg-sky-500 text-white font-black py-4 rounded-2xl shadow-xl shadow-sky-200 active:scale-95 transition-all flex items-center justify-center gap-2">
+                    <i data-lucide="plus" class="w-5 h-5"></i> 리스트에 추가하기
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. 앱 데이터 상태 ---
+        let attendance = [false, false, false, false, false, false, false];
+        let todos = [];
+        const fortuneMessages = [
+            "소현아 오늘도 화이팅!",
+            "우리가 만날 그날까지!",
+            "영원히 베프하자!!",
+            "힘내!!",
+            "ㅅㄹㅎ🧡"
+        ];
+        const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+
+        // --- 2. 앱 실행 초기화 ---
+        document.addEventListener('DOMContentLoaded', () => {
+            initApp();
+            updateTime();
+            setInterval(updateTime, 1000); // 1초마다 시간 갱신
+            lucide.createIcons(); // 아이콘 생성
+        });
+
+        function initApp() {
+            // 로컬 스토리지에서 저장된 메모 불러오기
+            const savedMemo = localStorage.getItem('daily_memo');
+            if (savedMemo) document.getElementById('memoArea').value = savedMemo;
+
+            // 로컬 스토리지에서 저장된 할 일 불러오기
+            const savedTodos = localStorage.getItem('daily_todos');
+            if (savedTodos) todos = JSON.parse(savedTodos);
+            renderTodos();
+
+            // 출석체크 데이터 로드 및 매주 월요일 초기화 로직
+            const savedAttendance = localStorage.getItem('daily_attendance');
+            const savedWeekStart = localStorage.getItem('daily_attendance_week');
+            const currentMonday = getMonday(new Date()).toString();
+
+            if (savedWeekStart !== currentMonday) {
+                attendance = [false, false, false, false, false, false, false];
+                localStorage.setItem('daily_attendance_week', currentMonday);
+                saveAttendance();
+            } else if (savedAttendance) {
+                attendance = JSON.parse(savedAttendance);
+            }
+            renderAttendance();
+
+            // 디데이 날짜 갱신
+            document.getElementById('dday1').innerText = `D-${getDDay(12, 13)}`;
+            document.getElementById('dday2').innerText = `D-${getDDay(6, 30)}`;
+
+            // 포춘 쿠키 팝업 설정
+            const randomFortune = fortuneMessages[Math.floor(Math.random() * fortuneMessages.length)];
+            document.getElementById('fortuneText').innerText = `"${randomFortune}"`;
+            
+            // 약간의 지연 후 팝업 노출 (애니메이션 효과)
+            setTimeout(() => {
+                document.getElementById('fortuneOverlay').classList.remove('hidden');
+            }, 500);
+        }
+
+        // --- 3. 시간 및 디데이 관련 유틸리티 ---
+        function updateTime() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = now.getMonth() + 1;
+            const date = now.getDate();
+            const day = dayNames[now.getDay()];
+            const h = String(now.getHours()).padStart(2, '0');
+            const m = String(now.getMinutes()).padStart(2, '0');
+            const s = String(now.getSeconds()).padStart(2, '0');
+
+            document.getElementById('simpleDate').innerText = `${year}년 ${month}월 ${date}일`;
+            document.getElementById('exactDate').innerText = `${year}년 ${month}월 ${date}일 ${day}요일 ${h}:${m}:${s}`;
+        }
+
+        function getDDay(m, d) {
+            const now = new Date();
+            let target = new Date(now.getFullYear(), m - 1, d);
+            if (now > target) target = new Date(now.getFullYear() + 1, m - 1, d);
+            return Math.ceil((target - now) / (1000 * 60 * 60 * 24));
+        }
+
+        function getMonday(d) {
+            const date = new Date(d);
+            const day = date.getDay();
+            const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+            return new Date(date.setDate(diff)).setHours(0,0,0,0);
+        }
+
+        // --- 4. 출석체크 렌더링 ---
+        function renderAttendance() {
+            const row = document.getElementById('attendanceRow');
+            row.innerHTML = '';
+            const today = new Date().getDay();
+
+            dayNames.forEach((name, i) => {
+                const item = document.createElement('div');
+                item.className = 'flex flex-col items-center gap-1.5 w-8';
+                
+                let textColor = 'text-slate-400';
+                if(i === 0) textColor = 'text-red-400'; // 일요일
+                if(i === 6) textColor = 'text-blue-400'; // 토요일
+
+                item.innerHTML = `
+                    <span class="text-[10px] font-bold ${textColor}">${name}</span>
+                    <div class="w-6 h-6 rounded-full flex items-center justify-center transition-all ${attendance[i] ? 'bg-green-400 shadow-sm' : 'bg-white/80 border border-sky-100'}">
+                        ${attendance[i] ? '<i data-lucide="check-circle-2" class="text-white w-4 h-4"></i>' : ''}
+                    </div>
+                `;
+                row.appendChild(item);
+            });
+            
+            // 오늘 출석 완료 여부에 따른 버튼 상태 변경
+            const btn = document.getElementById('checkInBtn');
+            if (attendance[today]) {
+                btn.innerText = '체크완료';
+                btn.classList.replace('bg-sky-500', 'bg-green-100');
+                btn.classList.replace('text-white', 'text-green-600');
+                btn.classList.add('border', 'border-green-200');
+                btn.disabled = true;
+            }
+            lucide.createIcons();
+        }
+
+        function saveAttendance() {
+            localStorage.setItem('daily_attendance', JSON.stringify(attendance));
+        }
+
+        // --- 5. 할 일(To-Do) 관리 ---
+        function renderTodos() {
+            const list = document.getElementById('todoList');
+            list.innerHTML = '';
+
+            if (todos.length === 0) {
+                list.innerHTML = '<div class="flex flex-col items-center justify-center h-full opacity-20 mt-4"><i data-lucide="heart" class="w-5 h-5"></i></div>';
+            } else {
+                todos.forEach(todo => {
+                    const item = document.createElement('div');
+                    item.className = 'group bg-white/50 p-2 rounded-xl border border-white shadow-sm transition-all hover:bg-white';
+                    item.innerHTML = `
+                        <div class="flex items-start gap-1.5">
+                            <button onclick="toggleTodo(${todo.id})" class="mt-0.5 flex-shrink-0 transition-transform active:scale-125">
+                                <i data-lucide="${todo.completed ? 'check-circle-2' : 'circle'}" class="w-3.5 h-3.5 ${todo.completed ? 'text-green-500' : 'text-slate-300'}"></i>
+                            </button>
+                            <span class="flex-1 text-[11px] font-medium break-all leading-tight ${todo.completed ? 'line-through text-slate-300' : 'text-slate-600'}">
+                                ${todo.text}
+                            </span>
+                        </div>
+                        ${todo.completed ? `
+                            <div class="flex justify-end mt-1">
+                                <button onclick="deleteTodo(${todo.id})" class="text-red-300 hover:text-red-500 transition-colors">
+                                    <i data-lucide="trash-2" class="w-2.5 h-2.5"></i>
+                                </button>
+                            </div>
+                        ` : ''}
+                    `;
+                    list.appendChild(item);
+                });
+            }
+            lucide.createIcons();
+        }
+
+        function toggleTodo(id) {
+            todos = todos.map(t => {
+                if (t.id === id) {
+                    // 완료 체크 시 폭죽 효과 실행 (요청사항 6번)
+                    if (!t.completed) {
+                        confetti({ 
+                            particleCount: 40, 
+                            spread: 50, 
+                            origin: { y: 0.8 }, 
+                            colors: ['#0ea5e9', '#22c55e', '#facc15'] 
+                        });
+                    }
+                    return { ...t, completed: !t.completed };
+                }
+                return t;
+            });
+            saveTodos();
+        }
+
+        function deleteTodo(id) {
+            todos = todos.filter(t => t.id !== id);
+            saveTodos();
+        }
+
+        function saveTodos() {
+            localStorage.setItem('daily_todos', JSON.stringify(todos));
+            renderTodos();
+        }
+
+        // --- 6. 이벤트 바인딩 ---
+
+        // 날짜 클릭 시 상세 시간 토글
+        document.getElementById('dateBtn').addEventListener('click', () => {
+            document.getElementById('exactTimeBox').classList.toggle('hidden');
+        });
+
+        // 날씨 아이콘 클릭 시 모달 토글
+        document.getElementById('weatherBtn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            document.getElementById('weatherModal').classList.toggle('hidden');
+        });
+
+        // 응원 팝업 닫기
+        document.getElementById('closeFortuneBtn').addEventListener('click', () => {
+            document.getElementById('fortuneOverlay').classList.add('hidden');
+        });
+
+        // 할 일 추가 모달 열기
+        document.getElementById('openTodoModalBtn').addEventListener('click', () => {
+            document.getElementById('todoOverlay').classList.remove('hidden');
+            document.getElementById('todoInput').focus();
+        });
+
+        // 할 일 추가 모달 닫기
+        document.getElementById('closeTodoModalBtn').addEventListener('click', () => {
+            document.getElementById('todoOverlay').classList.add('hidden');
+        });
+
+        // 할 일 저장
+        document.getElementById('saveTodoBtn').addEventListener('click', () => {
+            const input = document.getElementById('todoInput');
+            if (input.value.trim() === '') return;
+            todos.push({ id: Date.now(), text: input.value, completed: false });
+            saveTodos();
+            input.value = '';
+            document.getElementById('todoOverlay').classList.add('hidden');
+        });
+
+        // 입력창에서 엔터 키로 저장 가능하게
+        document.getElementById('todoInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') document.getElementById('saveTodoBtn').click();
+        });
+
+        // 메모장 실시간 저장
+        document.getElementById('memoArea').addEventListener('input', (e) => {
+            localStorage.setItem('daily_memo', e.target.value);
+        });
+
+        // 출석체크 버튼 클릭 (폭죽 효과 포함)
+        document.getElementById('checkInBtn').addEventListener('click', () => {
+            const today = new Date().getDay();
+            if (attendance[today]) return;
+            
+            attendance[today] = true;
+            saveAttendance();
+            renderAttendance();
+            
+            // 화려한 폭죽 효과 실행
+            confetti({ 
+                particleCount: 120, 
+                spread: 70, 
+                origin: { y: 0.6 }, 
+                colors: ['#0ea5e9', '#f0abfc', '#818cf8', '#fbbf24'] 
+            });
+        });
+
+        // 바탕 클릭 시 열려있는 날씨 모달 자동 닫기
+        window.addEventListener('click', () => {
+            document.getElementById('weatherModal').classList.add('hidden');
+        });
+
+    </script>
+</body>
+</html>
